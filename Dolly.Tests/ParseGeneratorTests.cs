@@ -20,7 +20,7 @@ public partial class SimpleClass
     public float DontClone { get; set; }
 }
 ");
-        var expected = new Model("Dolly", "SimpleClass", ModelFlags.None, new Member[] {
+        var expected = new Model("Dolly", "SimpleClass", "Dolly.Tests", ModelFlags.None, new Member[] {
             new Member("First", false, MemberFlags.None),
             new Member("Second", false, MemberFlags.None)
         }, EquatableArray<Member>.Empty());
@@ -47,7 +47,7 @@ public sealed partial class SimpleClass
             """
             using global::System.Linq;
             namespace Dolly;
-            partial class SimpleClass : global::Dolly.IClonable<SimpleClass>
+            partial class SimpleClass : global::Dolly.Tests.Dolly.IClonable<SimpleClass>
             {
                 object global::System.ICloneable.Clone() => this.DeepClone();
                 public global::Dolly.SimpleClass DeepClone() =>
@@ -82,7 +82,7 @@ public sealed partial record SimpleClass(string Foo);
             """
             using global::System.Linq;
             namespace Dolly;
-            partial record SimpleClass : global::Dolly.IClonable<SimpleClass>
+            partial record SimpleClass : global::Dolly.Tests.Dolly.IClonable<SimpleClass>
             {
                 object global::System.ICloneable.Clone() => this.DeepClone();
                 public global::Dolly.SimpleClass DeepClone() =>
@@ -116,7 +116,7 @@ public partial struct SimpleStruct
     public float DontClone { get; set; }
 }
 ");
-        var expected = new Model("Dolly", "SimpleStruct", ModelFlags.Struct | ModelFlags.IsSealed, new Member[] {
+        var expected = new Model("Dolly", "SimpleStruct", "Dolly.Tests", ModelFlags.Struct | ModelFlags.IsSealed, new Member[] {
             new Member("First", false, MemberFlags.None),
             new Member("Second", false, MemberFlags.None)
         }, EquatableArray<Member>.Empty());
@@ -168,7 +168,7 @@ public partial class ComplexClass
     public IEnumerable<SimpleStruct> ValueIEnumerable { get; set; }
 }
 ", name => name == "ComplexClass");
-        var expected = new Model("Dolly", "ComplexClass", ModelFlags.None, new Member[] {
+        var expected = new Model("Dolly", "ComplexClass", "Dolly.Tests", ModelFlags.None, new Member[] {
 
             new Member("IntArray", false, MemberFlags.Enumerable),
             new Member("IntList", false, MemberFlags.Enumerable | MemberFlags.NewCollection),
@@ -234,7 +234,7 @@ public partial class ComplexClass
     public IEnumerable<SimpleStruct>? ValueIEnumerable { get; set; }
 }
 ", name => name == "ComplexClass");
-        var expected = new Model("Dolly", "ComplexClass", ModelFlags.None, new Member[] {
+        var expected = new Model("Dolly", "ComplexClass", "Dolly.Tests", ModelFlags.None, new Member[] {
 
             new Member("IntArray", false, MemberFlags.Enumerable | MemberFlags.MemberNullable),
             new Member("IntList", false, MemberFlags.Enumerable | MemberFlags.NewCollection | MemberFlags.MemberNullable),
@@ -300,7 +300,7 @@ public partial class ComplexClass
     public IEnumerable<SimpleStruct?> ValueIEnumerable { get; set; }
 }
 ", name => name == "ComplexClass");
-        var expected = new Model("Dolly", "ComplexClass", ModelFlags.None, new Member[] {
+        var expected = new Model("Dolly", "ComplexClass", "Dolly.Tests", ModelFlags.None, new Member[] {
 
             new Member("IntArray", false, MemberFlags.Enumerable | MemberFlags.ElementNullable),
             new Member("IntList", false, MemberFlags.Enumerable | MemberFlags.NewCollection | MemberFlags.ElementNullable),
@@ -366,7 +366,7 @@ public partial class ComplexClass
     public IEnumerable<SimpleStruct?>? ValueIEnumerable { get; set; }
 }
 ", name => name == "ComplexClass");
-        var expected = new Model("Dolly", "ComplexClass", ModelFlags.None, new Member[] {
+        var expected = new Model("Dolly", "ComplexClass", "Dolly.Tests", ModelFlags.None, new Member[] {
             new Member("IntArray", false, MemberFlags.Enumerable | MemberFlags.MemberNullable | MemberFlags.ElementNullable),
             new Member("IntList", false, MemberFlags.Enumerable | MemberFlags.NewCollection | MemberFlags.MemberNullable | MemberFlags.ElementNullable),
             new Member("IntIEnumerable", false, MemberFlags.Enumerable | MemberFlags.MemberNullable | MemberFlags.ElementNullable),
@@ -424,7 +424,7 @@ public partial class ComplexClass
     public int? IntValueTypeNull { get; set; }
 }
 ", name => name == "ComplexClass");
-        var expected = new Model("Dolly", "ComplexClass", ModelFlags.None, new Member[] {
+        var expected = new Model("Dolly", "ComplexClass", "Dolly.Tests", ModelFlags.None, new Member[] {
             new Member("ReferenceTypeNotNull", false, MemberFlags.Clonable),
             new Member("ReferenceTypeNull", false, MemberFlags.Clonable | MemberFlags.MemberNullable),
             new Member("StringReferenceTypeNotNull", false, MemberFlags.None),
@@ -516,11 +516,12 @@ public partial {{modifiers}} ComplexClass{{(hasClonableBase ? ": SimpleClass" : 
 
 
     private static Compilation CreateCompilation(string source, bool addAttributes)
-           => CSharpCompilation.Create("compilation",
+           => CSharpCompilation.Create("Dolly.Tests",
                addAttributes ? [
+                   CSharpSyntaxTree.ParseText("global using Dolly.Tests.Dolly;", path: "GlobalUsings.g.cs"),
                    CSharpSyntaxTree.ParseText(source),
-                   CSharpSyntaxTree.ParseText(DollyGenerator.ClonableAttribute, path: "ClonableAttribute.g.cs"),
-                   CSharpSyntaxTree.ParseText(DollyGenerator.CloneIgnoreAttribute, path: "CloneIgnoreAttribute.g.cs")
+                   CSharpSyntaxTree.ParseText(DollyGenerator.GetClonableAttribute("Dolly.Tests"), path: "Dolly.Tests.Dolly.ClonableAttribute.g.cs"),
+                   CSharpSyntaxTree.ParseText(DollyGenerator.GetCloneIgnoreAttribute("Dolly.Tests"), path: "Dolly.Tests.Dolly.CloneIgnoreAttribute.g.cs")
                    ] :
                [CSharpSyntaxTree.ParseText(source)],
                new[] { MetadataReference.CreateFromFile(typeof(Binder).GetTypeInfo().Assembly.Location) },
@@ -557,7 +558,7 @@ public partial {{modifiers}} ComplexClass{{(hasClonableBase ? ": SimpleClass" : 
         var symbol = semanticModel.GetDeclaredSymbol(node);
         if (symbol is INamedTypeSymbol namedTypeSymbol)
         {
-            if (Model.TryCreate(namedTypeSymbol, true, out var model, out var error))
+            if (Model.TryCreate(namedTypeSymbol, true, "Dolly.Tests", out var model, out var error))
             {
                 return model;
             }

@@ -1,6 +1,6 @@
-namespace Dolly.Exmaple;
+using Dolly.Exmaple.Dolly;
 
-[Clonable]
+namespace Dolly.Exmaple;[Clonable]
 public partial struct SimpleStruct
 {
     public string First { get; set; }

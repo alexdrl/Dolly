@@ -1,4 +1,5 @@
 using FastCloner.SourceGenerator.Shared;
+using Dolly.Benchmarks.Dolly;
 
 namespace Dolly.Benchmarks;
 

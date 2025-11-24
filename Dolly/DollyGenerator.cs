@@ -27,35 +27,35 @@ namespace Dolly;
 [Generator]
 public partial class DollyGenerator : IIncrementalGenerator
 {
-    public const string ClonableAttribute = """
+    public static string GetClonableAttribute(string assemblyName) => $$"""
         using System;
 
-        namespace Dolly
+        namespace {{assemblyName}}.Dolly
         {
             [AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct)]
-            public class ClonableAttribute : Attribute
+            internal class ClonableAttribute : Attribute
             {
             }
         }
         """;
 
-    public const string CloneIgnoreAttribute = """
+    public static string GetCloneIgnoreAttribute(string assemblyName) => $$"""
         using System;
 
-        namespace Dolly
+        namespace {{assemblyName}}.Dolly
         {
             [AttributeUsage(AttributeTargets.Field | AttributeTargets.Property)]
-            public class CloneIgnoreAttribute : Attribute
+            internal class CloneIgnoreAttribute : Attribute
             {
             }
         }
         """;
 
-    public const string ClonableInterface = """
+    public static string GetClonableInterface(string assemblyName) => $$"""
         using System;
-        namespace Dolly
+        namespace {{assemblyName}}.Dolly
         {
-            public interface IClonable<T> : ICloneable
+            internal interface IClonable<T> : ICloneable
             {
                 T DeepClone();
                 T ShallowClone();
@@ -65,33 +65,60 @@ public partial class DollyGenerator : IIncrementalGenerator
 
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
-        context.RegisterPostInitializationOutput(ctx =>
+        // Extract assembly name from compilation
+        var assemblyNameProvider = context.CompilationProvider
+            .Select((compilation, _) => compilation.AssemblyName ?? "App");
+
+        // Register attributes and interface with assembly name
+        context.RegisterSourceOutput(assemblyNameProvider, static (context, assemblyName) =>
         {
-            ctx.AddSource("ClonableAttribute.g.cs", ClonableAttribute);
-            ctx.AddSource("CloneIgnoreAttribute.g.cs", CloneIgnoreAttribute);
-            ctx.AddSource("IClonable.g.cs", ClonableInterface);
+            context.AddSource($"{assemblyName}.Dolly.ClonableAttribute.g.cs", GetClonableAttribute(assemblyName));
+            context.AddSource($"{assemblyName}.Dolly.CloneIgnoreAttribute.g.cs", GetCloneIgnoreAttribute(assemblyName));
+            context.AddSource($"{assemblyName}.Dolly.IClonable.g.cs", GetClonableInterface(assemblyName));
         });
 
-        var pipeline = context.SyntaxProvider.ForAttributeWithMetadataName<Result<Model>>(
-            fullyQualifiedMetadataName: "Dolly.ClonableAttribute",
-            predicate: static (node, cancellationToken) => node is ClassDeclarationSyntax || node is StructDeclarationSyntax || node is RecordDeclarationSyntax,
+        var pipeline = context.SyntaxProvider.CreateSyntaxProvider(
+            predicate: static (node, cancellationToken) =>
+            {
+                // Look for types with Clonable attribute
+                if (node is ClassDeclarationSyntax classDecl && classDecl.AttributeLists.Count > 0)
+                {
+                    return classDecl.AttributeLists.Any(al => al.Attributes.Any(a => 
+                        a.Name.ToString() == "Clonable" || a.Name.ToString() == "ClonableAttribute"));
+                }
+                if (node is StructDeclarationSyntax structDecl && structDecl.AttributeLists.Count > 0)
+                {
+                    return structDecl.AttributeLists.Any(al => al.Attributes.Any(a => 
+                        a.Name.ToString() == "Clonable" || a.Name.ToString() == "ClonableAttribute"));
+                }
+                if (node is RecordDeclarationSyntax recordDecl && recordDecl.AttributeLists.Count > 0)
+                {
+                    return recordDecl.AttributeLists.Any(al => al.Attributes.Any(a => 
+                        a.Name.ToString() == "Clonable" || a.Name.ToString() == "ClonableAttribute"));
+                }
+                return false;
+            },
             transform: static (context, cancellationToken) =>
             {
-                var symbol = context.SemanticModel.GetDeclaredSymbol(context.TargetNode);
+                var symbol = context.SemanticModel.GetDeclaredSymbol(context.Node);
+                var assemblyName = context.SemanticModel.Compilation.AssemblyName ?? "App";
+                
                 if (symbol is INamedTypeSymbol namedTypeSymbol)
                 {
-                    var nullabilityEnabled = context.SemanticModel.GetNullableContext(context.TargetNode.SpanStart).HasFlag(NullableContext.Enabled);
-                    if (Model.TryCreate(namedTypeSymbol, nullabilityEnabled, out var model, out var error))
+                    var nullabilityEnabled = context.SemanticModel.GetNullableContext(context.Node.SpanStart).HasFlag(NullableContext.Enabled);
+                    if (Model.TryCreate(namedTypeSymbol, nullabilityEnabled, assemblyName, out var model, out var error))
                     {
-                        return model;
+                        return (Result<Model>?)model;
                     }
                     else
                     {
-                        return error;
+                        return (Result<Model>?)error;
                     }
                 }
-                return DiagnosticInfo.Create(Diagnostics.FailedToGetModelError, context.TargetNode);
-            });
+                return (Result<Model>?)null;
+            })
+            .Where(static result => result is not null)
+            .Select(static (result, _) => result!);
 
         context.RegisterSourceOutput(pipeline, static (context, result) =>
         {

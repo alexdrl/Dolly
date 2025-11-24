@@ -20,7 +20,7 @@ namespace Dolly
             return SourceText.From($$"""
                     using global::System.Linq;
                     namespace {{model.Namespace}};
-                    {{model.GetModifiers()}} {{model.Name}} : global::Dolly.IClonable<{{model.Name}}>
+                    {{model.GetModifiers()}} {{model.Name}} : global::{{model.AssemblyName}}.Dolly.IClonable<{{model.Name}}>
                     {
                         {{(!model.HasClonableBaseClass ? "object global::System.ICloneable.Clone() => this.DeepClone();" : "")}}
                         public {{model.GetMethodModifiers()}}global::{{model.Namespace}}.{{model.Name}} DeepClone() =>

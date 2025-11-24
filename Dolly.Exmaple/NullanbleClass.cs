@@ -1,3 +1,5 @@
+using Dolly.Exmaple.Dolly;
+
 namespace Dolly.Exmaple;
 [Clonable]
 public partial class NullanbleClass

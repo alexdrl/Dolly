@@ -38,8 +38,8 @@ public static class ISymbolExtensionMethods
         return false;
     }
 
-    public static bool IsClonable(this ITypeSymbol typeSymbol) =>
-        typeSymbol.HasAttribute("ClonableAttribute") || typeSymbol.AllInterfaces.Any(i => i.Name == "IClone");
+    public static bool IsClonable(this ITypeSymbol typeSymbol, string assemblyName) =>
+        typeSymbol.HasAttribute("ClonableAttribute", $"{assemblyName}.Dolly") || typeSymbol.AllInterfaces.Any(i => i.Name == "IClonable");
 
     public static string GetFullName(this ISymbol symbol)
     {

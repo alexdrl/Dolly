@@ -15,7 +15,7 @@ public class ModelTests
     [Arguments(ModelFlags.Record | ModelFlags.IsSealed, "partial record")]
     public async Task Modifiers(ModelFlags flags, string expected)
     {
-        var model = new Model("test", "test", flags, [], []);
+        var model = new Model("test", "test", "Dolly.Tests", flags, [], []);
         var modifiers = model.GetModifiers();
         await Assert.That(modifiers).IsEqualTo(expected);
     }
@@ -28,7 +28,7 @@ public class ModelTests
     [Arguments(ModelFlags.IsSealed, "")]
     public async Task MethodModifiers(ModelFlags flags, string expected)
     {
-        var model = new Model("test", "test", flags, [], []);
+        var model = new Model("test", "test", "Dolly.Tests", flags, [], []);
         var modifiers = model.GetMethodModifiers().Trim();
         await Assert.That(modifiers).IsEqualTo(expected);
     }

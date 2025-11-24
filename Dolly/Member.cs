@@ -30,14 +30,14 @@ public sealed record Member(string Name, bool IsReadonly, MemberFlags Flags)
     public bool IsMemberNullable => Flags.HasFlag(MemberFlags.MemberNullable);
     public bool IsElementNullable => Flags.HasFlag(MemberFlags.ElementNullable);
 
-    public static Member Create(string name, bool isReadonly, bool nullabilityEnabled, ITypeSymbol symbol)
+    public static Member Create(string name, bool isReadonly, bool nullabilityEnabled, ITypeSymbol symbol, string assemblyName)
     {
-        var flags = GetFlags(symbol, nullabilityEnabled);
+        var flags = GetFlags(symbol, nullabilityEnabled, assemblyName);
         return new Member(name, isReadonly, flags);
 
     }
 
-    private static MemberFlags GetFlags(ITypeSymbol symbol, bool nullabilityEnabled)
+    private static MemberFlags GetFlags(ITypeSymbol symbol, bool nullabilityEnabled, string assemblyName)
     {
         MemberFlags flags = MemberFlags.None;
         if (symbol.IsNullable(nullabilityEnabled, out symbol))
@@ -54,7 +54,7 @@ public sealed record Member(string Name, bool IsReadonly, MemberFlags Flags)
             {
                 flags |= MemberFlags.ElementNullable;
             }
-            if (elementType.IsClonable())
+            if (elementType.IsClonable(assemblyName))
             {
                 flags |= MemberFlags.Clonable;
             }
@@ -68,7 +68,7 @@ public sealed record Member(string Name, bool IsReadonly, MemberFlags Flags)
             {
                 flags |= MemberFlags.ElementNullable;
             }
-            if (elementType.IsClonable())
+            if (elementType.IsClonable(assemblyName))
             {
                 flags |= MemberFlags.Clonable;
             }
@@ -87,12 +87,12 @@ public sealed record Member(string Name, bool IsReadonly, MemberFlags Flags)
             {
                 flags |= MemberFlags.ElementNullable;
             }
-            if (enumerableType.IsClonable())
+            if (enumerableType.IsClonable(assemblyName))
             {
                 flags |= MemberFlags.Clonable;
             }
         }
-        else if (symbol.IsClonable())
+        else if (symbol.IsClonable(assemblyName))
         {
             flags |= MemberFlags.Clonable;
         }

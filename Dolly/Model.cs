@@ -25,7 +25,7 @@ public partial record struct Test
 }
 
 [DebuggerDisplay("{Namespace}.{Name}")]
-public record Model(string Namespace, string Name, ModelFlags Flags, EquatableArray<Member> Members, EquatableArray<Member> Constructor)
+public record Model(string Namespace, string Name, string AssemblyName, ModelFlags Flags, EquatableArray<Member> Members, EquatableArray<Member> Constructor)
 {
     public bool HasClonableBaseClass => Flags.HasFlag(ModelFlags.ClonableBase);
     public bool IsRecord => Flags.HasFlag(ModelFlags.Record);
@@ -68,7 +68,7 @@ public record Model(string Namespace, string Name, ModelFlags Flags, EquatableAr
         return builder.ToString().TrimEnd();
     }
 
-    public static bool TryCreate(INamedTypeSymbol symbol, bool nullabilityEnabled, [NotNullWhen(true)] out Model? model, [NotNullWhen(false)] out DiagnosticInfo? error)
+    public static bool TryCreate(INamedTypeSymbol symbol, bool nullabilityEnabled, string assemblyName, [NotNullWhen(true)] out Model? model, [NotNullWhen(false)] out DiagnosticInfo? error)
     {
         model = null;
         error = null;
@@ -81,14 +81,14 @@ public record Model(string Namespace, string Name, ModelFlags Flags, EquatableAr
         var properties = symbol
             .RecursiveFlatten(t => t.BaseType).SelectMany(t => t.GetMembers())
             .OfType<IPropertySymbol>()
-            .Where(p => !p.IsImplicitlyDeclared && !p.HasAttribute("CloneIgnoreAttribute") && !p.IsStatic)
-            .Select(p => Member.Create(p.Name, p.SetMethod == null, nullabilityEnabled, p.Type))
+            .Where(p => !p.IsImplicitlyDeclared && !p.HasAttribute("CloneIgnoreAttribute", $"{assemblyName}.Dolly") && !p.IsStatic)
+            .Select(p => Member.Create(p.Name, p.SetMethod == null, nullabilityEnabled, p.Type, assemblyName))
             .ToArray();
         var fields = symbol
             .RecursiveFlatten(t => t.BaseType).SelectMany(t => t.GetMembers())
             .OfType<IFieldSymbol>()
-            .Where(f => !f.IsImplicitlyDeclared && !f.HasAttribute("CloneIgnoreAttribute") && !f.IsStatic && !f.IsConst)
-            .Select(m => Member.Create(m.Name, m.IsReadOnly, nullabilityEnabled, m.Type))
+            .Where(f => !f.IsImplicitlyDeclared && !f.HasAttribute("CloneIgnoreAttribute", $"{assemblyName}.Dolly") && !f.IsStatic && !f.IsConst)
+            .Select(m => Member.Create(m.Name, m.IsReadOnly, nullabilityEnabled, m.Type, assemblyName))
             .ToArray();
 
         var members = properties.Concat(fields).ToArray();
@@ -108,12 +108,12 @@ public record Model(string Namespace, string Name, ModelFlags Flags, EquatableAr
 
         var constructorMembers = constructor.Parameters.Select(p => members.Single(m => m.Name.Equals(p.Name, StringComparison.OrdinalIgnoreCase))).ToArray();
         var membersExcludingConstructor = members.Except(constructorMembers).ToArray();
-        var flags = Model.GetFlags(symbol);
-        model = new Model(symbol.GetNamespace(), symbol.Name, flags, membersExcludingConstructor, constructorMembers);
+        var flags = Model.GetFlags(symbol, assemblyName);
+        model = new Model(symbol.GetNamespace(), symbol.Name, assemblyName, flags, membersExcludingConstructor, constructorMembers);
         return true;
     }
 
-    private static ModelFlags GetFlags(INamedTypeSymbol namedTypeSymbol)
+    private static ModelFlags GetFlags(INamedTypeSymbol namedTypeSymbol, string assemblyName)
     {
         var flags = ModelFlags.None;
         if (namedTypeSymbol.IsRecord)
@@ -126,7 +126,7 @@ public record Model(string Namespace, string Name, ModelFlags Flags, EquatableAr
             flags |= ModelFlags.Struct;
         }
 
-        if (namedTypeSymbol.RecursiveFlatten(t => t.BaseType).Skip(1).Any(t => t.IsClonable()))
+        if (namedTypeSymbol.RecursiveFlatten(t => t.BaseType).Skip(1).Any(t => t.IsClonable(assemblyName)))
         {
             flags |= ModelFlags.ClonableBase;
         }
